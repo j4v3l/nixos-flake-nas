@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Validate flake
+        run: nix flake check --show-trace
+
+      - name: Build system configuration
+        run: nix build .#nixosConfigurations.beelink-mini.config.system.build.toplevel --dry-run
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: validate-release
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog from git commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s" $LAST_TAG..HEAD)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s")
+          fi
+          
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          body: |
+            ## NixOS NAS Configuration Release ${{ steps.tag.outputs.tag }}
+            
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### Deployment
+            To deploy this release:
+            
+            1. Clone or update your repository:
+               ```bash
+               git clone https://github.com/${{ github.repository }}.git
+               cd nixos-flake-nas
+               git checkout ${{ steps.tag.outputs.tag }}
+               ```
+            
+            2. Deploy using the deployment script:
+               ```bash
+               ./scripts/deploy.sh
+               ```
+            
+            ### Configuration
+            - NixOS version: 25.05
+            - Includes: Samba, Home Manager, Security hardening
+            - Target hardware: Beelink Mini PC (configurable)
+            
+            ### Security Notes
+            - Remember to change default passwords after first deployment
+            - Configure SSH keys and disable password authentication
+            - Review firewall rules for your network setup
+            
+            ---
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.last_tag }}...${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false 

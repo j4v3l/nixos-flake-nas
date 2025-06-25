@@ -1,0 +1,47 @@
+# Nix
+result
+result-*
+.direnv/
+
+# Hardware configurations (often auto-generated)
+# Uncomment if you want to ignore hardware configs
+# hardware/*.nix
+
+# Secrets and private keys
+*.key
+*.pem
+secrets/
+.secrets/
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Log files
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.vim/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# System backup files
+.passwords-configured
+config-backups/

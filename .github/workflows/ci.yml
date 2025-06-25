@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  flake-check:
+    name: Flake Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+            substituters = https://cache.nixos.org/ https://cache.iog.io
+
+      - name: Enable Nix flakes
+        run: |
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+      - name: Validate flake
+        run: nix flake check --show-trace
+
+      - name: Check flake metadata
+        run: nix flake metadata
+
+      - name: Build system configuration (dry-run)
+        run: nix build .#nixosConfigurations.beelink-mini.config.system.build.toplevel --dry-run
+
+      - name: Evaluate all outputs
+        run: nix eval .#nixosConfigurations.beelink-mini.config.system.build.toplevel.outPath
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Check for hardcoded secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  lint-and-format:
+    name: Linting and Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Check Nix formatting
+        run: |
+          nix fmt --help || echo "Nix fmt not available, skipping format check"
+          # Check if files are properly formatted (when formatter is available)
+          if command -v nixpkgs-fmt >/dev/null 2>&1; then
+            find . -name "*.nix" -exec nixpkgs-fmt --check {} \;
+          fi
+
+      - name: Validate Nix syntax
+        run: |
+          # Check all Nix files for syntax errors
+          find . -name "*.nix" -exec nix-instantiate --parse {} \; >/dev/null
+
+      - name: Check shell scripts
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for required documentation
+        run: |
+          # Check if key documentation files exist
+          test -f README.md || (echo "README.md is missing" && exit 1)
+          test -f .gitignore || (echo ".gitignore is missing" && exit 1)
+          
+          # Check README completeness
+          grep -q "Quick Start" README.md || (echo "README missing Quick Start section" && exit 1)
+          grep -q "Configuration" README.md || (echo "README missing Configuration section" && exit 1)
+          grep -q "Security" README.md || (echo "README missing Security section" && exit 1)
+
+      - name: Check for TODO/FIXME items
+        run: |
+          echo "Checking for TODO/FIXME items that should be addressed:"
+          grep -r "TODO\|FIXME\|XXX" --include="*.nix" --include="*.md" --include="*.sh" . || echo "No TODO/FIXME items found"
+
+  integration-test:
+    name: Integration Testing
+    runs-on: ubuntu-latest
+    needs: [flake-check]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Test module imports
+        run: |
+          # Test that all modules can be imported without errors
+          nix-instantiate --eval --strict -E 'let pkgs = import <nixpkgs> {}; in (import ./modules/base.nix { config = {}; inherit pkgs; lib = pkgs.lib; })'
+          nix-instantiate --eval --strict -E 'let pkgs = import <nixpkgs> {}; in (import ./modules/samba.nix { config = {}; inherit pkgs; lib = pkgs.lib; })'
+          nix-instantiate --eval --strict -E 'let pkgs = import <nixpkgs> {}; in (import ./modules/secrets.nix { config = {}; inherit pkgs; lib = pkgs.lib; })'
+          nix-instantiate --eval --strict -E 'let pkgs = import <nixpkgs> {}; in (import ./modules/wifi.nix { config = {}; lib = pkgs.lib; })'
+
+      - name: Test Home Manager configuration
+        run: |
+          nix-instantiate --eval --strict -E 'let pkgs = import <nixpkgs> {}; in (import ./home/jager.nix { config = {}; inherit pkgs; lib = pkgs.lib; })'
+
+  deployment-validation:
+    name: Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [flake-check, security-scan]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment script
+        run: |
+          # Check deployment script syntax
+          bash -n scripts/deploy.sh
+          
+          # Check for required variables and functions
+          grep -q "TARGET_HOST" scripts/deploy.sh || (echo "TARGET_HOST not defined" && exit 1)
+          grep -q "check_connection" scripts/deploy.sh || (echo "check_connection function missing" && exit 1)
+          grep -q "apply_configuration" scripts/deploy.sh || (echo "apply_configuration function missing" && exit 1)
+
+      - name: Check deployment prerequisites
+        run: |
+          echo "Deployment script validation completed"
+          echo "Manual deployment testing required on actual hardware" 

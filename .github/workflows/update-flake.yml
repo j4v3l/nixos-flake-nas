@@ -1,0 +1,79 @@
+name: Update Flake Inputs
+
+on:
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update-flake:
+    name: Update Flake Inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update flake inputs
+        id: update
+        run: |
+          # Update flake inputs
+          nix flake update --commit-lock-file --commit-lockfile-summary "chore: update flake inputs"
+          
+          # Check if there are any changes
+          if git diff --quiet HEAD~1 HEAD; then
+            echo "No updates available"
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+          else
+            echo "Updates found"
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            
+            # Get the commit message for PR description
+            COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+            echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate updated configuration
+        if: steps.update.outputs.has_updates == 'true'
+        run: |
+          nix flake check --show-trace
+
+      - name: Create Pull Request
+        if: steps.update.outputs.has_updates == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: ${{ steps.update.outputs.commit_message }}
+          title: "🔄 Update flake inputs"
+          body: |
+            ## Automated Flake Update
+            
+            This PR updates the flake inputs to their latest versions.
+            
+            ### Changes
+            - ${{ steps.update.outputs.commit_message }}
+            
+            ### Validation
+            - ✅ Flake validation passed
+            - ✅ Configuration can be built
+            
+            ### Next Steps
+            1. Review the changes in `flake.lock`
+            2. Test deployment on non-production environment if available
+            3. Merge when ready
+            
+            ---
+            *This PR was automatically created by the Update Flake Inputs workflow*
+          branch: update-flake-inputs
+          delete-branch: true
+          draft: false 
