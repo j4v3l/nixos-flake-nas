@@ -54,6 +54,9 @@
     # System administration essentials
     sudo
     systemd
+    
+    # Fonts
+    nerd-fonts.fira-code
   ];
 
   # Security configurations

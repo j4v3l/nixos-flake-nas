@@ -7,6 +7,7 @@
     ../../modules/samba.nix
     ../../modules/secrets.nix
     ../../modules/wifi.nix
+    ../../modules/storage.nix
     # Home Manager configuration is now handled through flake.nix
   ];
 

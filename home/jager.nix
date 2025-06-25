@@ -39,13 +39,16 @@
     ghostty  # Terminal emulator and terminfo
     
     # System information
-    neofetch # system information
+    fastfetch # system information (faster than neofetch)
     lsof # list open files
     dysk  # Modern disk usage analyzer
     
     # Network tools (user-specific)
     nmap # network mapper
     iperf3 # network performance tester
+    
+    # Fonts for user applications
+    nerd-fonts.fira-code
   ];
 
   # Git configuration
@@ -65,12 +68,12 @@
     enableCompletion = true;
     bashrcExtra = ''
       # Custom aliases for NAS management (enhanced with modern tools)
-      alias ll='eza -la --git --header'
-      alias la='eza -a'
-      alias l='eza'
-      alias ls='eza --color=auto'
-      alias lt='eza -T'           # Tree view
-      alias lg='eza -la --git'    # Git status in listing
+      alias ll='eza -la --git --header --icons'
+      alias la='eza -a --icons'
+      alias l='eza --icons'
+      alias ls='eza --color=auto --icons'
+      alias lt='eza -T --icons'           # Tree view with icons
+      alias lg='eza -la --git --icons'    # Git status in listing with icons
       alias ..='cd ..'
       alias ...='cd ../..'
       
@@ -116,6 +119,7 @@
       alias check-data='df -h /mnt/data'
       alias check-root='df -h /'
       alias check-boot='df -h /boot'
+      alias check-all-drives='df -h /mnt/drive* /mnt/data'
       alias diskusage='df -h'
       alias diskfree='df -h'
       alias dysk-data='dysk /mnt/data'
@@ -123,6 +127,20 @@
       alias dysk-all='dysk'
       alias space='dysk'
       alias usage='dysk --type d'  # Show directories only
+      
+      # NVMe drive management
+      alias list-nvme='sudo nvme list'
+      alias nvme-health='sudo smartctl -H /dev/nvme*n1'
+      alias nvme-temp='sudo smartctl -A /dev/nvme*n1 | grep -i temperature'
+      alias nvme-info='sudo nvme id-ctrl /dev/nvme0n1 | head -20'
+      alias drive-health='sudo smartctl -H /dev/nvme*n1'
+      alias drive-temp='for d in /dev/nvme*n1; do echo "$d:"; sudo smartctl -A "$d" | grep -i temp || echo "No temp data"; done'
+      
+      # Storage monitoring
+      alias iostat-nvme='iostat -x 1 5 nvme*'
+      alias iotop-nvme='sudo iotop -a -o -d 2'
+      alias storage-status='systemctl status storage-setup storage-monitor'
+      alias storage-logs='sudo journalctl -u storage-setup -u storage-monitor -f'
       
       # System monitoring
       alias temps='sensors 2>/dev/null || echo "lm-sensors not available"'
@@ -140,6 +158,11 @@
       
       # Quick navigation
       alias cddata='cd /mnt/data'
+      alias cddrive1='cd /mnt/drive1'
+      alias cddrive2='cd /mnt/drive2'
+      alias cddrive3='cd /mnt/drive3'
+      alias cddrive4='cd /mnt/drive4'
+      alias cddrive5='cd /mnt/drive5'
       alias cdetc='cd /etc/nixos'
       alias cdlogs='cd /var/log'
       
@@ -176,13 +199,13 @@
     
     # Shell aliases (migrated from bash)
     shellAliases = {
-      # Modern CLI replacements
-      ll = "eza -la --git --header";
-      la = "eza -a";
-      l = "eza";
-      ls = "eza --color=auto";
-      lt = "eza -T";           # Tree view
-      lg = "eza -la --git";    # Git status in listing
+      # Modern CLI replacements with icons
+      ll = "eza -la --git --header --icons";
+      la = "eza -a --icons";
+      l = "eza --icons";
+      ls = "eza --color=auto --icons";
+      lt = "eza -T --icons";           # Tree view with icons
+      lg = "eza -la --git --icons";    # Git status in listing with icons
       ".." = "cd ..";
       "..." = "cd ../..";
       
@@ -228,6 +251,7 @@
       check-data = "df -h /mnt/data";
       check-root = "df -h /";
       check-boot = "df -h /boot";
+      check-all-drives = "df -h /mnt/drive* /mnt/data";
       diskusage = "df -h";
       diskfree = "df -h";
       dysk-data = "dysk /mnt/data";
@@ -235,6 +259,20 @@
       dysk-all = "dysk";
       space = "dysk";
       usage = "dysk --type d";  # Show directories only
+      
+      # NVMe drive management
+      list-nvme = "sudo nvme list";
+      nvme-health = "sudo smartctl -H /dev/nvme*n1";
+      nvme-temp = "sudo smartctl -A /dev/nvme*n1 | grep -i temperature";
+      nvme-info = "sudo nvme id-ctrl /dev/nvme0n1 | head -20";
+      drive-health = "sudo smartctl -H /dev/nvme*n1";
+      drive-temp = "for d in /dev/nvme*n1; do echo \"$d:\"; sudo smartctl -A \"$d\" | grep -i temp || echo 'No temp data'; done";
+      
+      # Storage monitoring
+      iostat-nvme = "iostat -x 1 5 nvme*";
+      iotop-nvme = "sudo iotop -a -o -d 2";
+      storage-status = "systemctl status storage-setup storage-monitor";
+      storage-logs = "sudo journalctl -u storage-setup -u storage-monitor -f";
       
       # System monitoring
       temps = "sensors 2>/dev/null || echo 'lm-sensors not available'";
@@ -252,6 +290,11 @@
       
       # Quick navigation
       cddata = "cd /mnt/data";
+      cddrive1 = "cd /mnt/drive1";
+      cddrive2 = "cd /mnt/drive2";
+      cddrive3 = "cd /mnt/drive3";
+      cddrive4 = "cd /mnt/drive4";
+      cddrive5 = "cd /mnt/drive5";
       cdetc = "cd /etc/nixos";
       cdlogs = "cd /var/log";
       
@@ -466,6 +509,19 @@
     ];
   };
 
+  # Eza configuration (modern ls replacement)
+  programs.eza = {
+    enable = true;
+    enableBashIntegration = true;
+    enableZshIntegration = true;
+    icons = "always";
+    git = true;
+    extraOptions = [
+      "--group-directories-first"
+      "--header"
+    ];
+  };
+
   # Let Home Manager install and manage itself
   programs.home-manager.enable = true;
 
@@ -475,6 +531,9 @@
   # User services (if needed later)
   # systemd.user.services = {};
   
+  # Font configuration
+  fonts.fontconfig.enable = true;
+
   # Environment variables
   home.sessionVariables = {
     EDITOR = "vim";
@@ -482,5 +541,7 @@
     PAGER = "less";
     # Terminal compatibility - fallback for ghostty
     TERM = "xterm-256color";
+    # Font configuration for applications
+    FONTCONFIG_FILE = "${config.xdg.configHome}/fontconfig/fonts.conf";
   };
 } 

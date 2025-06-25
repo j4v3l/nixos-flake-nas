@@ -53,6 +53,7 @@ nixos-flake-nas/
 ### System Components
 
 - **Base System**: Essential packages, users, security hardening
+- **Storage**: Advanced 6-drive NVMe management with RAID support
 - **Samba**: File sharing with authentication and local network restrictions
 - **WiFi**: NetworkManager-based WiFi configuration
 - **Secrets**: Initial password setup and security checklist
@@ -184,18 +185,28 @@ samba-shares             # Show active shares
 samba-logs               # Recent logs
 ```
 
-### Disk Usage & Monitoring
+### Storage & Drive Management
 
 ```bash
-# Modern disk usage (dysk)
+# Drive Status & Health
+list-nvme                # List all NVMe drives
+drive-health             # Check all drive health
+drive-temp               # Monitor drive temperatures
+nvme-health              # NVMe health status
+check-all-drives         # Check all drive usage
+
+# Storage Monitoring
+storage-status           # Storage services status
+storage-logs             # Storage service logs
+iostat-nvme              # Real-time I/O monitoring
+iotop-nvme               # I/O process monitoring
+
+# Disk Usage Analysis
 space                    # Show disk usage with dysk
 usage                    # Show directory usage
 dysk-data                # Check /mnt/data usage
 dysk-root                # Check root filesystem
-
-# Traditional tools
 df                       # Disk free space
-du                       # Directory usage
 check-data               # Check data disk
 diskusage                # All filesystem usage
 ```
@@ -222,6 +233,24 @@ journal                  # Live system logs
 
 ```bash
 cddata                   # Go to /mnt/data
+cddrive1                 # Go to /mnt/drive1
+cddrive2                 # Go to /mnt/drive2
+cddrive3                 # Go to /mnt/drive3
+cddrive4                 # Go to /mnt/drive4
+cddrive5                 # Go to /mnt/drive5
 cdetc                    # Go to /etc/nixos
 cdlogs                   # Go to /var/log
 ```
+
+## 💾 Storage Configuration
+
+This configuration supports the **Beelink ME mini's 6x M.2 NVMe slots** with advanced storage management features:
+
+- **Automatic drive detection** and health monitoring
+- **RAID support** (RAID 0, 1, 5, 6, 10) for redundancy and performance
+- **Individual drive mounting** at `/mnt/drive1` through `/mnt/drive5`
+- **Performance optimization** with NVMe-specific tuning
+- **Temperature monitoring** and thermal management
+- **SMART health checks** with automated alerting
+
+For detailed storage setup and configuration options, see **[docs/STORAGE.md](docs/STORAGE.md)**.

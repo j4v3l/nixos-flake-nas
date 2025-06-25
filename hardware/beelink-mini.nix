@@ -8,10 +8,16 @@
     [ (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
-  boot.initrd.availableKernelModules = [ "xhci_pci" "nvme" "usb_storage" "usbhid" "sd_mod" "sdhci_pci" ];
+  boot.initrd.availableKernelModules = [ 
+    "xhci_pci" "nvme" "nvme-core" "usb_storage" "usbhid" "sd_mod" "sdhci_pci" 
+    "ahci" "ata_piix" "ata_generic" "pata_acpi"
+  ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ];
+  boot.kernelModules = [ "kvm-intel" "nvme" "nvme-core" ];
   boot.extraModulePackages = [ ];
+  
+  # Enable all NVMe and storage-related kernel modules for 6-slot support
+  boot.initrd.includeDefaultModules = true;
 
   fileSystems."/" =
     { device = "/dev/disk/by-uuid/c70264c5-a59c-40b0-9018-989fa43df239";
