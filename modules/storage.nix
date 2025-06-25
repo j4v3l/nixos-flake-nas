@@ -116,7 +116,7 @@ in
       
       # Monitoring and diagnostics
       iotop         # I/O monitoring
-      iostat        # I/O statistics
+      sysstat       # Contains iostat for I/O statistics
       lsof          # List open files
       fio           # Flexible I/O tester
     ];
@@ -138,25 +138,8 @@ in
     ];
 
     # Filesystems configuration for detected drives
-    fileSystems = mkMerge [
-      # Primary data mount (can be RAID or single drive)
-      {
-        ${cfg.dataPath} = {
-          device = if cfg.raidLevel != null then "/dev/md0" else "/dev/disk/by-label/data";
-          fsType = "ext4";
-          options = [ "defaults" "user_xattr" "acl" "nofail" ];
-        };
-      }
-      
-      # Individual drive mounts (when not using RAID)
-      (mkIf (cfg.raidLevel == null) (
-        mapAttrs' (name: drive: nameValuePair drive.mountPoint {
-          device = "/dev/disk/by-label/${drive.label}";
-          fsType = drive.fsType;
-          options = [ "defaults" "user_xattr" "acl" "nofail" ];
-        }) cfg.drives
-      ))
-    ];
+    # Note: Only configure filesystems if they exist
+    # Individual drive mounts will be handled by the storage-setup service
 
     # Services for storage management
     systemd.services = {
@@ -222,7 +205,35 @@ in
             fi
           done
 
-          # Create basic data structure if main data mount is empty
+          # Try to mount drives if they exist
+          echo "=== Attempting to mount available drives ==="
+          for label in data drive1 drive2 drive3 drive4 drive5; do
+            if [ -e "/dev/disk/by-label/$label" ]; then
+              mount_point=""
+              case "$label" in
+                data) mount_point="${cfg.dataPath}" ;;
+                drive1) mount_point="/mnt/drive1" ;;
+                drive2) mount_point="/mnt/drive2" ;;
+                drive3) mount_point="/mnt/drive3" ;;
+                drive4) mount_point="/mnt/drive4" ;;
+                drive5) mount_point="/mnt/drive5" ;;
+              esac
+              
+              if [ -n "$mount_point" ]; then
+                echo "Mounting $label to $mount_point"
+                mkdir -p "$mount_point"
+                if ! mountpoint -q "$mount_point"; then
+                  mount "/dev/disk/by-label/$label" "$mount_point" || echo "Failed to mount $label"
+                else
+                  echo "$mount_point already mounted"
+                fi
+              fi
+            else
+              echo "Drive with label '$label' not found"
+            fi
+          done
+
+          # Create basic data structure if main data mount is available and empty
           if mountpoint -q ${cfg.dataPath} && [ -z "$(ls -A ${cfg.dataPath} 2>/dev/null)" ]; then
             echo "Creating basic data structure in ${cfg.dataPath}"
             mkdir -p ${cfg.dataPath}/{shared,media,backups,documents}
@@ -255,7 +266,7 @@ in
               # Check temperature (if supported)
               temp=$(smartctl -A "$nvme_dev" | grep -i temperature | head -1 | awk '{print $10}' || echo "")
               if [[ -n "$temp" && "$temp" -gt 70 ]]; then
-                echo "WARNING: Drive $nvme_dev temperature is high: ${temp}°C" | systemd-cat -t storage-monitor -p warning
+                echo "WARNING: Drive $nvme_dev temperature is high: ''${temp}°C" | systemd-cat -t storage-monitor -p warning
               fi
             fi
           done
