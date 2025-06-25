@@ -21,6 +21,8 @@ nixos-flake-nas/
 │   ├── base.nix          # Base system configuration
 │   ├── samba.nix         # Samba file sharing
 │   ├── secrets.nix       # Security and secrets management
+│   ├── storage.nix       # Advanced 6-drive NVMe management
+│   ├── motd.nix          # Server-style MOTD (Message of the Day)
 │   └── wifi.nix          # WiFi configuration
 │
 ├── home/                  # Home Manager configurations
@@ -56,6 +58,7 @@ nixos-flake-nas/
 - **Storage**: Advanced 6-drive NVMe management with RAID support
 - **Samba**: File sharing with authentication and local network restrictions
 - **WiFi**: NetworkManager-based WiFi configuration
+- **MOTD**: Professional server-style welcome message with system status
 - **Secrets**: Initial password setup and security checklist
 - **Home Manager**: User-specific package management and dotfiles
 
@@ -254,3 +257,29 @@ This configuration supports the **Beelink ME mini's 6x M.2 NVMe slots** with adv
 - **SMART health checks** with automated alerting
 
 For detailed storage setup and configuration options, see **[docs/STORAGE.md](docs/STORAGE.md)**.
+
+## 🖥️ MOTD (Message of the Day)
+
+The MOTD module provides a professional server-style welcome message that displays:
+
+- **System Information**: Hostname, kernel, uptime, load, memory, temperature
+- **Network Details**: IP address, SSH/Samba ports
+- **Storage Status**: NVMe drive count, mounted drives, usage
+- **Service Status**: SSH, Samba, Storage management
+- **Quick Commands**: Useful server management commands
+- **Smart Warnings**: Drive expansion alerts and system notices
+
+### Configuration
+
+```nix
+motd = {
+  enable = true;                    # Enable MOTD
+  serverName = "My NAS Server";     # Custom server name
+  updateInterval = "5min";          # Update frequency
+  showOnLogin = true;              # Show on shell login
+  enableColors = true;             # Colored output
+  showWarnings = true;             # System warnings
+};
+```
+
+For detailed MOTD configuration and customization options, see **[docs/MOTD.md](docs/MOTD.md)**.

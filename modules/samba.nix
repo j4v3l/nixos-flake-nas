@@ -60,14 +60,8 @@
     '';
   };
 
-  # Data disk configuration - flexible to handle different setups
-  fileSystems."/mnt/data" = {
-    # Try by-label first, fall back to by-uuid if needed
-    # This will need to be configured based on actual disk setup
-    device = "/dev/disk/by-label/data";
-    fsType = "ext4";
-    options = [ "defaults" "user_xattr" "acl" "nofail" ]; # nofail prevents boot failure if disk not present
-  };
+  # Data disk mounting is handled by the storage module
+  # The /mnt/data directory will be created by the setup service below
 
   # Create data directory and set permissions
   systemd.services.setup-data-directory = {

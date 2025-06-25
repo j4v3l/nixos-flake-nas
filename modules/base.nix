@@ -1,101 +1,162 @@
-{ config, pkgs, ... }:
+# Base system configuration for Beelink ME mini NAS
+{ config, pkgs, lib, ... }:
 
 {
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-  # Bootloader configuration (systemd-boot for UEFI systems)
+  # Boot configuration
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  time.timeZone = "UTC";
+  # Time zone and locale
+  time.timeZone = "America/New_York";
   i18n.defaultLocale = "en_US.UTF-8";
 
+  # User configuration
   users.users.jager = {
     isNormalUser = true;
-    # Initial password hash for "temp123" - CHANGE IMMEDIATELY AFTER FIRST LOGIN
-    # Generated with: mkpasswd -m sha-512
-    initialPassword = "temp123";
-    extraGroups = [ "wheel" "docker" "users" ];
-    # Create home directory
+    initialPassword = "temp123";  # CHANGE IMMEDIATELY AFTER FIRST LOGIN
+    extraGroups = [ "wheel" "docker" "users" "networkmanager" "storage" ];
     createHome = true;
     home = "/home/jager";
-    # Set up zsh shell
     shell = pkgs.zsh;
   };
 
   # Enable mutable users for initial setup
-  # Set to false after passwords are properly configured
   users.mutableUsers = true;
 
+  # Enable services
   virtualisation.docker.enable = true;
-
-  # Enable zsh system-wide
   programs.zsh.enable = true;
 
-  # Essential system packages (keep minimal, user packages go to home-manager)
+  # System packages
   environment.systemPackages = with pkgs; [
-    # Network utilities (system-wide)
-    curl
-    wget
-    rsync
-    
-    # System monitoring (system-wide)
-    htop
-    iotop
-    
-    # Basic text editing (system-wide for emergency access)
+    # Core utilities
     vim
     nano
+    git
+    curl
+    wget
+    htop
+    btop
+    tree
+    unzip
+    zip
+    rsync
+    screen
+    tmux
     
-    # Network debugging (system-wide)
+    # Network tools
+    nmap
+    iperf3
+    speedtest-cli
     inetutils  # ping, telnet, etc.
     nettools   # netstat, route, etc.
+    
+    # System monitoring
+    iotop
+    lm_sensors
+    smartmontools
+    
+    # File management
+    mc  # Midnight Commander
+    ranger
+    
+    # Development tools
+    gcc
+    gnumake
+    
+    # Fonts
+    nerd-fonts.fira-code
+    
+    # Modern replacements
+    fastfetch  # System info
+    eza        # Better ls
+    bat        # Better cat
+    fd         # Better find
+    ripgrep    # Better grep
+    dust       # Better du
+    duf        # Better df
+    
+
     
     # System administration essentials
     sudo
     systemd
-    
-    # Fonts
-    nerd-fonts.fira-code
   ];
 
   # Security configurations
-  security.sudo.wheelNeedsPassword = true;
-  
-  # Firewall configuration
+  security.sudo.wheelNeedsPassword = false;  # Disable for convenience on NAS
+
+  # Networking
+  networking.networkmanager.enable = true;
   networking.firewall = {
     enable = true;
-    allowedTCPPorts = [ 22 ]; # SSH only by default
-    # Samba ports will be configured in the samba module
+    allowedTCPPorts = [ 22 139 445 ]; # SSH, Samba
+    allowedUDPPorts = [ 137 138 ]; # NetBIOS
   };
 
-  # Enable automatic security updates
+  # SSH configuration with security hardening
+  services.openssh = {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;  # Use SSH keys only
+      KbdInteractiveAuthentication = false;
+      PermitRootLogin = "no";
+      MaxAuthTries = 3;
+      ClientAliveInterval = 300;
+      ClientAliveCountMax = 2;
+      Protocol = 2;
+      X11Forwarding = false;
+    };
+    extraConfig = ''
+      AllowUsers jager
+    '';
+  };
+
+  # Fail2ban for SSH protection
+  services.fail2ban = {
+    enable = true;
+    maxretry = 3;
+    bantime = "1h";
+    bantime-increment = {
+      enable = true;
+      multipliers = "2 4 8 16 32 64";
+      maxtime = "168h"; # 1 week
+    };
+  };
+
+  # System maintenance
+  nix = {
+    settings = {
+      auto-optimise-store = true;
+      experimental-features = [ "nix-command" "flakes" ];
+    };
+    gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 30d";
+    };
+  };
+
+  # Automatic updates
   system.autoUpgrade = {
     enable = true;
-    allowReboot = false; # Set to true if you want automatic reboots
-    channel = "https://nixos.org/channels/nixos-25.05";
-    dates = "daily";
+    dates = "04:00";
+    allowReboot = false;
+    flake = "/home/jager/nixos-flake-nas";
+    flags = [ "--update-input" "nixpkgs" ];
     randomizedDelaySec = "30min";
   };
 
-  # Additional security services
-  services = {
-    logrotate.enable = true;
-    
-    # SSH hardening
-    openssh = {
-      enable = true;
-      settings = {
-        # Allow password authentication initially for setup, disable after SSH keys are configured
-        PasswordAuthentication = true; # Change to false after SSH key setup
-        PermitRootLogin = "no";
-        Protocol = 2;
-        X11Forwarding = false;
-        # Additional security settings
-        MaxAuthTries = 3;
-        ClientAliveInterval = 300;
-        ClientAliveCountMax = 2;
-      };
-    };
+  # Additional services
+  services.logrotate.enable = true;
+  services.smartd = {
+    enable = true;
+    autodetect = true;
   };
+
+  # Additional shell configuration
+  programs.bash.shellInit = ''
+    # Custom prompt for server
+    export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+  '';
 }
