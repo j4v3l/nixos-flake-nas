@@ -9,6 +9,7 @@
     ../../modules/wifi.nix
     ../../modules/storage.nix
     ../../modules/motd.nix
+    ../../modules/wireguard.nix
     # Home Manager configuration is now handled through flake.nix
   ];
 
@@ -16,5 +17,34 @@
   wifi.enable = true;
   storage.enable = true;  # Enable advanced storage management for 6-slot NAS
   motd.enable = true;     # Enable server-style MOTD
+  
+  # WireGuard VPN Configuration
+  wireguard = {
+    enable = true;
+    mode = "server";
+    
+    serverConfig = {
+      listenPort = 51820;
+      subnet = "10.100.0.0/24";
+      serverIP = "10.100.0.1/24";
+      dns = [ "1.1.1.1" "8.8.8.8" ];
+      # Only route home network and VPN subnet, not all internet traffic
+      allowedIPs = [ "192.168.1.0/24" "10.100.0.0/24" ];
+    };
+    
+    # Restrict to local network for security
+    restrictToLocalNetwork = true;
+    
+    # Example peers - you'll need to replace with actual client public keys
+    peers = [
+      # {
+      #   name = "laptop";
+      #   publicKey = "YOUR_CLIENT_PUBLIC_KEY_HERE";
+      #   allowedIPs = [ "10.100.0.2/32" ];
+      #   persistentKeepalive = 25;
+      # }
+    ];
+  };
+  
   system.stateVersion = "25.05";
 }
