@@ -175,6 +175,35 @@ in
       default = [];
       description = "Commands to run after interface is down";
     };
+
+    # Add WGDashboard option
+    webInterface = {
+      enable = mkEnableOption "WGDashboard web interface";
+      
+      port = mkOption {
+        type = types.port;
+        default = 10086;
+        description = "Port for WGDashboard web interface";
+      };
+      
+      adminUsername = mkOption {
+        type = types.str;
+        default = "admin";
+        description = "Admin username for WGDashboard";
+      };
+      
+      adminPasswordFile = mkOption {
+        type = types.path;
+        default = "/etc/wireguard/dashboard-password";
+        description = "File containing admin password for WGDashboard";
+      };
+      
+      autoUpdate = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Automatically update WGDashboard weekly";
+      };
+    };
   };
 
   config = mkIf cfg.enable {
@@ -230,52 +259,55 @@ in
       "net.ipv6.conf.all.forwarding" = 1;
     };
 
-    # WireGuard interface configuration
-    networking.wg-quick.interfaces.${cfg.interface} = {
-      # Interface configuration
-      address = if cfg.mode == "server" 
-        then [ cfg.serverConfig.serverIP ]
-        else cfg.clientConfig.address;
-      
-      listenPort = mkIf (cfg.mode == "server") cfg.serverConfig.listenPort;
-      
-      privateKeyFile = if cfg.mode == "server"
-        then cfg.serverConfig.privateKeyFile
-        else cfg.clientConfig.privateKeyFile;
+    # WireGuard interface configuration (only if not using web interface)
+    networking.wg-quick.interfaces = mkIf (!cfg.webInterface.enable) {
+      ${cfg.interface} = {
+        # Interface configuration
+        address = if cfg.mode == "server" 
+          then [ cfg.serverConfig.serverIP ]
+          else cfg.clientConfig.address;
+        
+        listenPort = mkIf (cfg.mode == "server") cfg.serverConfig.listenPort;
+        
+        privateKeyFile = if cfg.mode == "server"
+          then cfg.serverConfig.privateKeyFile
+          else cfg.clientConfig.privateKeyFile;
 
-      # DNS configuration
-      dns = if cfg.mode == "client" && (length cfg.clientConfig.dns > 0)
-        then cfg.clientConfig.dns
-        else if cfg.mode == "server" then cfg.serverConfig.dns
-        else [];
+        # DNS configuration
+        dns = if cfg.mode == "client" && (length cfg.clientConfig.dns > 0)
+          then cfg.clientConfig.dns
+          else if cfg.mode == "server" then cfg.serverConfig.dns
+          else [];
 
-      # Peers configuration
-      peers = map (peer: {
-        inherit (peer) publicKey allowedIPs;
-        endpoint = peer.endpoint;
-        persistentKeepalive = peer.persistentKeepalive;
-        presharedKeyFile = peer.presharedKeyFile;
-      }) cfg.peers;
+        # Peers configuration
+        peers = map (peer: {
+          inherit (peer) publicKey allowedIPs;
+          endpoint = peer.endpoint;
+          persistentKeepalive = peer.persistentKeepalive;
+          presharedKeyFile = peer.presharedKeyFile;
+        }) cfg.peers;
 
-      # Post up/down commands
-      postUp = cfg.postUp ++ (optionals (cfg.mode == "server") [
-        # Server-specific iptables rules for NAT
-        "${pkgs.iptables}/bin/iptables -A FORWARD -i ${cfg.interface} -j ACCEPT"
-        "${pkgs.iptables}/bin/iptables -A FORWARD -o ${cfg.interface} -j ACCEPT"
-        "${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s ${cfg.serverConfig.subnet} -o eth0 -j MASQUERADE"
-      ]);
+        # Post up/down commands
+        postUp = cfg.postUp ++ (optionals (cfg.mode == "server") [
+          # Server-specific iptables rules for NAT
+          "${pkgs.iptables}/bin/iptables -A FORWARD -i ${cfg.interface} -j ACCEPT"
+          "${pkgs.iptables}/bin/iptables -A FORWARD -o ${cfg.interface} -j ACCEPT"
+          "${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -s ${cfg.serverConfig.subnet} -o eth0 -j MASQUERADE"
+        ]);
 
-      postDown = cfg.postDown ++ (optionals (cfg.mode == "server") [
-        # Clean up server-specific iptables rules
-        "${pkgs.iptables}/bin/iptables -D FORWARD -i ${cfg.interface} -j ACCEPT 2>/dev/null || true"
-        "${pkgs.iptables}/bin/iptables -D FORWARD -o ${cfg.interface} -j ACCEPT 2>/dev/null || true"
-        "${pkgs.iptables}/bin/iptables -t nat -D POSTROUTING -s ${cfg.serverConfig.subnet} -o eth0 -j MASQUERADE 2>/dev/null || true"
-      ]);
+        postDown = cfg.postDown ++ (optionals (cfg.mode == "server") [
+          # Clean up server-specific iptables rules
+          "${pkgs.iptables}/bin/iptables -D FORWARD -i ${cfg.interface} -j ACCEPT 2>/dev/null || true"
+          "${pkgs.iptables}/bin/iptables -D FORWARD -o ${cfg.interface} -j ACCEPT 2>/dev/null || true"
+          "${pkgs.iptables}/bin/iptables -t nat -D POSTROUTING -s ${cfg.serverConfig.subnet} -o eth0 -j MASQUERADE 2>/dev/null || true"
+        ]);
+      };
     };
 
     # Firewall configuration
     networking.firewall = mkIf cfg.openFirewall {
       allowedUDPPorts = mkIf (cfg.mode == "server") [ cfg.serverConfig.listenPort ];
+      allowedTCPPorts = mkIf cfg.webInterface.enable [ cfg.webInterface.port ];
       
       # Restrict to local networks if enabled
       extraCommands = mkIf cfg.restrictToLocalNetwork (mkIf (cfg.mode == "server") ''
@@ -322,6 +354,123 @@ in
         '';
       };
     };
+
+    # WGDashboard web interface
+    virtualisation.docker.enable = mkIf cfg.webInterface.enable true;
+    
+    systemd.services.wgdashboard = mkIf cfg.webInterface.enable {
+      description = "WGDashboard - WireGuard Web Interface";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "docker.service" "wg-quick-${cfg.interface}.service" ];
+      requires = [ "docker.service" ];
+      serviceConfig = {
+        Type = "simple";
+        Restart = "always";
+        RestartSec = "10";
+        ExecStartPre = [
+          # Pull the latest image
+          "${pkgs.docker}/bin/docker pull donaldzou/wgdashboard:latest"
+          # Remove any existing container
+          "-${pkgs.docker}/bin/docker rm -f wgdashboard"
+        ];
+        ExecStart = "${pkgs.docker}/bin/docker run --rm --name wgdashboard " +
+          "--cap-add NET_ADMIN " +
+          "--cap-add SYS_MODULE " +
+          "-v /etc/wireguard:/etc/wireguard " +
+          "-v /lib/modules:/lib/modules:ro " +
+          "-p ${toString cfg.webInterface.port}:10086 " +
+          "donaldzou/wgdashboard:latest";
+        ExecStop = "${pkgs.docker}/bin/docker stop wgdashboard";
+      };
+    };
+
+    # WGDashboard automatic update service
+    systemd.services.wgdashboard-update = mkIf (cfg.webInterface.enable && cfg.webInterface.autoUpdate) {
+      description = "Update WGDashboard Docker image";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = pkgs.writeScript "wgdashboard-update" ''
+          #!${pkgs.bash}/bin/bash
+          set -e
+          
+          echo "Checking for WGDashboard updates..."
+          
+          # Pull latest image
+          ${pkgs.docker}/bin/docker pull donaldzou/wgdashboard:latest
+          
+          # Get current and latest image IDs
+          CURRENT_ID=$(${pkgs.docker}/bin/docker inspect wgdashboard --format='{{.Image}}' 2>/dev/null || echo "")
+          LATEST_ID=$(${pkgs.docker}/bin/docker inspect donaldzou/wgdashboard:latest --format='{{.Id}}' 2>/dev/null || echo "")
+          
+          if [[ "$CURRENT_ID" != "$LATEST_ID" && -n "$LATEST_ID" ]]; then
+            echo "New WGDashboard version available. Restarting service..."
+            systemctl restart wgdashboard.service
+            echo "WGDashboard updated successfully!"
+          else
+            echo "WGDashboard is already up to date."
+          fi
+        '';
+      };
+    };
+
+    # Weekly update timer for WGDashboard
+    systemd.timers.wgdashboard-update = mkIf (cfg.webInterface.enable && cfg.webInterface.autoUpdate) {
+      description = "Weekly WGDashboard update check";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "weekly";
+        RandomizedDelaySec = "1h";
+        Persistent = true;
+      };
+    };
+
+    # Create default dashboard password if it doesn't exist
+    systemd.services.wgdashboard-setup = mkIf cfg.webInterface.enable {
+      description = "Setup WGDashboard default password and config";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "wgdashboard.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${pkgs.bash}/bin/bash -c '" + ''
+          set -e
+          
+          PASSWORD_FILE="${cfg.webInterface.adminPasswordFile}"
+          WG_CONFIG="/etc/wireguard/${cfg.interface}.conf"
+          
+          # Create directory if it doesn't exist
+          mkdir -p "$(dirname "$PASSWORD_FILE")"
+          
+          # Generate default password if file doesn't exist
+          if [[ ! -f "$PASSWORD_FILE" ]]; then
+            echo "admin" > "$PASSWORD_FILE"
+            chmod 600 "$PASSWORD_FILE"
+            echo "WGDashboard default password created at: $PASSWORD_FILE"
+            echo "Default login: ${cfg.webInterface.adminUsername}/admin"
+            echo "Please change the password after first login!"
+          fi
+          
+          # Create WireGuard config file for WGDashboard if it doesn't exist
+          if [[ ! -f "$WG_CONFIG" ]]; then
+            echo "Creating WireGuard config for WGDashboard..."
+            cat > "$WG_CONFIG" << 'EOF'
+[Interface]
+Address = ${cfg.serverConfig.serverIP}
+PrivateKey = $(cat ${cfg.serverConfig.privateKeyFile})
+ListenPort = ${toString cfg.serverConfig.listenPort}
+DNS = ${concatStringsSep ", " cfg.serverConfig.dns}
+PostUp = iptables -A FORWARD -i ${cfg.interface} -j ACCEPT; iptables -A FORWARD -o ${cfg.interface} -j ACCEPT; iptables -t nat -A POSTROUTING -s ${cfg.serverConfig.subnet} -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i ${cfg.interface} -j ACCEPT; iptables -D FORWARD -o ${cfg.interface} -j ACCEPT; iptables -t nat -D POSTROUTING -s ${cfg.serverConfig.subnet} -o eth0 -j MASQUERADE
+SaveConfig = true
+
+EOF
+            chmod 600 "$WG_CONFIG"
+            echo "WireGuard config created for WGDashboard management"
+          fi
+        '' + "';";
+      };
+    };
+
 
 
   };

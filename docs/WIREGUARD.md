@@ -9,16 +9,20 @@ The WireGuard module provides a flexible and secure VPN solution for:
 - **Remote NAS Access**: Securely access your home network and file shares from anywhere
 - **Site-to-Site VPN**: Connect multiple networks (home, office) securely
 - **Peer-to-Peer**: Direct encrypted connections between devices
+- **Web Management**: Modern web interface for easy configuration and monitoring
 
 ## Features
 
 - **Multi-mode Operation**: Server, client, or peer-to-peer configurations
+- **Web Interface**: WGDashboard for browser-based management and monitoring
 - **Automatic Key Management**: Server keys are auto-generated and managed
 - **Client Config Generator**: Built-in script to generate client configurations
 - **Firewall Integration**: Automatic firewall rules with security options
 - **QR Code Support**: Generate QR codes for easy mobile device setup
 - **Flexible Routing**: Custom post-up/down commands for advanced networking
 - **Security Hardening**: Local network restrictions and proper defaults
+- **Auto-Updates**: Automatic weekly updates for the web interface
+- **Docker Integration**: Containerized web interface with proper isolation
 
 ## Quick Start
 
@@ -36,6 +40,14 @@ Add to your `hosts/beelink-mini/configuration.nix`:
     enable = true;
     mode = "server";
     
+    # Enable web interface for easy management
+    webInterface = {
+      enable = true;
+      port = 10086;
+      adminUsername = "admin";
+      autoUpdate = true;  # Weekly automatic updates
+    };
+    
     peers = [
       {
         name = "laptop";
@@ -48,13 +60,21 @@ Add to your `hosts/beelink-mini/configuration.nix`:
 }
 ```
 
-### 2. Deploy and Generate Client Config
+### 2. Deploy and Access Web Interface
 
 ```bash
 # Deploy the configuration
 sudo nixos-rebuild switch --flake .#beelink-mini
 
-# Generate client configuration
+# Access the web interface
+# Open browser to: http://192.168.1.253:10086
+# Default login: admin/admin
+```
+
+### 3. Command Line Client Config Generation (Alternative)
+
+```bash
+# Generate client configuration via command line
 sudo wireguard-client-config laptop 192.168.1.100:51820 10.100.0.2/32
 
 # Generate QR code for mobile
@@ -75,6 +95,26 @@ wireguard = {
   enablePacketForwarding = true;    # Enable IP forwarding (server mode)
 };
 ```
+
+### Web Interface Configuration
+
+```nix
+wireguard.webInterface = {
+  enable = true;                              # Enable WGDashboard web interface
+  port = 10086;                               # Web interface port
+  adminUsername = "admin";                    # Dashboard admin username
+  adminPasswordFile = "/etc/wireguard/dashboard-password";  # Password file path
+  autoUpdate = true;                          # Weekly automatic updates
+};
+```
+
+**Important Notes about Web Interface:**
+
+- When `webInterface.enable = true`, the module uses WGDashboard to manage WireGuard instead of NixOS native configuration
+- Your NixOS configuration options are automatically converted to WireGuard config format
+- Default login credentials are `admin/admin` - **change immediately after first login**
+- The web interface provides real-time monitoring, peer management, and configuration editing
+- Automatic updates check weekly for new WGDashboard versions
 
 ### Server Configuration
 
@@ -131,17 +171,61 @@ wireguard = {
 };
 ```
 
+## Web Interface Management
+
+### Accessing WGDashboard
+
+1. **Open browser to**: `http://YOUR_SERVER_IP:10086`
+2. **Default login**: `admin/admin` (change immediately!)
+3. **Features available**:
+   - Real-time connection monitoring
+   - Peer management (add/remove/edit)
+   - Configuration file editing
+   - QR code generation for mobile devices
+   - Connection logs and statistics
+   - Bulk client operations
+
+### Web Interface Features
+
+- **Dashboard Overview**: Connection status, data transfer, active peers
+- **Peer Management**: Add, edit, delete, and monitor individual peers
+- **Configuration Editor**: Direct editing of WireGuard configuration files
+- **QR Code Generator**: Instant QR codes for mobile device setup
+- **Logs & Monitoring**: Real-time logs and connection statistics
+- **Bulk Operations**: Export configurations, bulk peer management
+- **Settings**: Interface settings, security options, and preferences
+
+### Managing Updates
+
+```bash
+# Check update status
+sudo systemctl status wgdashboard-update.timer
+
+# Manual update check
+sudo systemctl start wgdashboard-update.service
+
+# View update logs
+sudo journalctl -u wgdashboard-update.service
+```
+
 ## Usage Scenarios
 
-### 1. Remote NAS Access
+### 1. Remote NAS Access with Web Management
 
-**Use Case**: Access your home NAS and network from anywhere securely.
+**Use Case**: Access your home NAS and network from anywhere with easy web-based management.
 
 ```nix
 # NAS Configuration
 wireguard = {
   enable = true;
   mode = "server";
+  
+  # Enable web interface for easy management
+  webInterface = {
+    enable = true;
+    port = 10086;
+    autoUpdate = true;
+  };
   
   serverConfig = {
     subnet = "10.100.0.0/24";
@@ -165,6 +249,8 @@ networking.firewall.extraCommands = ''
 '';
 ```
 
+**Management**: Use web interface at `http://192.168.1.253:10086` to add clients, monitor connections, and generate mobile configs.
+
 ### 2. Site-to-Site VPN
 
 **Use Case**: Connect multiple networks securely.
@@ -174,6 +260,8 @@ networking.firewall.extraCommands = ''
 wireguard = {
   enable = true;
   mode = "server";
+  
+  webInterface.enable = true;  # Manage remotely
   
   peers = [
     {
@@ -236,7 +324,26 @@ wireguard = {
 
 ## Security Best Practices
 
-### 1. Key Management
+### 1. Web Interface Security
+
+```nix
+wireguard.webInterface = {
+  enable = true;
+  # Use strong admin password
+  adminPasswordFile = "/etc/wireguard/strong-password";
+  # Consider non-standard port
+  port = 8443;
+};
+
+# Restrict web interface access
+networking.firewall.extraCommands = ''
+  # Only allow web interface from local network
+  iptables -A nixos-fw -s 192.168.1.0/24 -p tcp --dport 8443 -j ACCEPT
+  iptables -A nixos-fw -p tcp --dport 8443 -j DROP
+'';
+```
+
+### 2. Key Management
 
 ```bash
 # Server keys are auto-generated, but you can manage them manually:
@@ -245,7 +352,7 @@ sudo chmod 600 /etc/wireguard/private.key
 sudo wg pubkey < /etc/wireguard/private.key > /etc/wireguard/public.key
 ```
 
-### 2. Network Restrictions
+### 3. Network Restrictions
 
 ```nix
 wireguard = {
@@ -259,7 +366,7 @@ wireguard = {
 };
 ```
 
-### 3. Preshared Keys
+### 4. Preshared Keys
 
 ```nix
 wireguard.peers = [
@@ -273,7 +380,7 @@ wireguard.peers = [
 ];
 ```
 
-### 4. Firewall Integration
+### 5. Firewall Integration
 
 ```nix
 networking.firewall = {
@@ -297,7 +404,13 @@ sudo wg show
 # View server public key
 sudo cat /etc/wireguard/public.key
 
-# Generate client configuration
+# Check web interface status
+sudo systemctl status wgdashboard.service
+
+# View web interface logs
+sudo journalctl -u wgdashboard.service -f
+
+# Generate client configuration (command line)
 sudo wireguard-client-config client-name server-ip:port client-ip
 
 # Generate QR code for mobile
@@ -305,6 +418,22 @@ sudo wireguard-client-config phone | qrencode -t ansiutf8
 
 # Monitor connections
 sudo journalctl -u wg-quick-wg0 -f
+```
+
+### Web Interface Management
+
+```bash
+# Restart web interface
+sudo systemctl restart wgdashboard.service
+
+# Update web interface manually
+sudo systemctl start wgdashboard-update.service
+
+# Check update timer status
+sudo systemctl list-timers wgdashboard-update.timer
+
+# View update logs
+sudo journalctl -u wgdashboard-update.service
 ```
 
 ### Client Management
@@ -337,6 +466,25 @@ sudo iptables -L INPUT | grep 51820
 ping 10.100.0.1  # VPN server IP
 ```
 
+### Web Interface Issues
+
+```bash
+# Check Docker service
+sudo systemctl status docker.service
+
+# Check WGDashboard container
+sudo docker ps | grep wgdashboard
+
+# View container logs
+sudo docker logs wgdashboard
+
+# Check firewall for web interface
+sudo iptables -L INPUT | grep 10086
+
+# Test web interface connectivity
+curl -I http://localhost:10086
+```
+
 ### Common Problems
 
 1. **Can't connect to server**
@@ -344,15 +492,26 @@ ping 10.100.0.1  # VPN server IP
    - Verify endpoint IP/port is correct
    - Ensure server is listening: `sudo ss -ulnp | grep 51820`
 
-2. **Connected but no internet/network access**
+2. **Web interface not accessible**
+   - Check if Docker is running: `sudo systemctl status docker`
+   - Verify container is running: `sudo docker ps`
+   - Check firewall allows web interface port
+   - Ensure port is not already in use
+
+3. **Connected but no internet/network access**
    - Check IP forwarding: `cat /proc/sys/net/ipv4/ip_forward`
    - Verify NAT rules: `sudo iptables -t nat -L POSTROUTING`
    - Check DNS configuration
 
-3. **Keys not working**
+4. **Keys not working**
    - Regenerate keys: `sudo systemctl restart wireguard-key-gen`
    - Verify public key matches private key
    - Check file permissions (600 for private keys)
+
+5. **Web interface shows wrong configuration**
+   - When web interface is enabled, NixOS config is converted to WireGuard format
+   - Restart `wgdashboard-setup.service` to regenerate config
+   - Check `/etc/wireguard/wg0.conf` for proper format
 
 ## Integration with Existing Modules
 
@@ -360,13 +519,26 @@ ping 10.100.0.1  # VPN server IP
 
 ```nix
 # Use secrets module for key management
-age.secrets.wireguard-private = {
-  file = ../secrets/wireguard-private.age;
-  path = "/etc/wireguard/private.key";
-  mode = "600";
+age.secrets = {
+  wireguard-private = {
+    file = ../secrets/wireguard-private.age;
+    path = "/etc/wireguard/private.key";
+    mode = "600";
+  };
+  dashboard-password = {
+    file = ../secrets/dashboard-password.age;
+    path = "/etc/wireguard/dashboard-password";
+    mode = "600";
+  };
 };
 
-wireguard.serverConfig.privateKeyFile = "/etc/wireguard/private.key";
+wireguard = {
+  serverConfig.privateKeyFile = "/etc/wireguard/private.key";
+  webInterface = {
+    enable = true;
+    adminPasswordFile = "/etc/wireguard/dashboard-password";
+  };
+};
 ```
 
 ### With Samba Module
@@ -409,11 +581,67 @@ wireguard.peers = [
 ];
 ```
 
+## Monitoring and Maintenance
+
+### Automated Monitoring
+
+```nix
+# Add monitoring for WireGuard service
+systemd.services.wireguard-monitor = {
+  description = "Monitor WireGuard connections";
+  serviceConfig = {
+    Type = "oneshot";
+    ExecStart = "${pkgs.bash}/bin/bash -c 'wg show | logger -t wireguard-monitor'";
+  };
+};
+
+systemd.timers.wireguard-monitor = {
+  description = "Monitor WireGuard every 5 minutes";
+  wantedBy = [ "timers.target" ];
+  timerConfig = {
+    OnCalendar = "*:0/5";
+    Persistent = true;
+  };
+};
+```
+
+### Backup Configuration
+
+```bash
+# Backup WireGuard configuration
+sudo cp -r /etc/wireguard /backup/wireguard-$(date +%Y%m%d)
+
+# Backup web interface data (if using custom settings)
+sudo docker exec wgdashboard tar -czf - /opt/wgdashboard/src/static/configurations > wgdashboard-backup-$(date +%Y%m%d).tar.gz
+```
+
 ## Examples
 
 See the `examples/` directory for complete configuration examples:
 
-- `examples/wireguard-nas-server.nix` - NAS server setup
+- `examples/wireguard-nas-server.nix` - NAS server setup with web interface
+
+## Migration from Command-Line to Web Interface
+
+If you have an existing WireGuard setup without web interface:
+
+1. **Add web interface to configuration**:
+
+```nix
+wireguard.webInterface = {
+  enable = true;
+  port = 10086;
+  autoUpdate = true;
+};
+```
+
+2. **Deploy the configuration**:
+
+```bash
+sudo nixos-rebuild switch --flake .#your-host
+```
+
+3. **Access web interface**: Your existing configuration will be automatically converted and available in the web interface.
 
 ## Advanced Features
 
@@ -428,10 +656,20 @@ wireguard = {
 
 ### Multiple WireGuard Instances
 
+While this module focuses on single-instance setup, you can run multiple WireGuard interfaces by using the lower-level `networking.wg-quick.interfaces` directly for additional instances.
+
+### Docker Integration
+
+The web interface uses Docker for isolation and easy updates. Docker is automatically enabled when using the web interface, but you can customize Docker settings:
+
 ```nix
-# You can run multiple WireGuard interfaces
-# by creating multiple module instances or using
-# the lower-level networking.wg-quick.interfaces directly
+virtualisation.docker = {
+  enable = true;
+  autoPrune.enable = true;  # Clean up old images
+  daemon.settings = {
+    log-driver = "journald";
+  };
+};
 ```
 
-This completes the WireGuard module documentation. The module provides a secure, flexible VPN solution that integrates seamlessly with your existing NixOS infrastructure.
+This completes the updated WireGuard module documentation, now including comprehensive coverage of the WGDashboard web interface, automatic updates, and enhanced management capabilities.

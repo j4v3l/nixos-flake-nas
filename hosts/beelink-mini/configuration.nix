@@ -35,6 +35,13 @@
     # Restrict to local network for security
     restrictToLocalNetwork = true;
     
+    # Enable WGDashboard web interface
+    webInterface = {
+      enable = true;
+      port = 10086;
+      adminUsername = "admin";
+    };
+    
     # Example peers - you'll need to replace with actual client public keys
     peers = [
       # {
