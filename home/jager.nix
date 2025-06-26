@@ -491,6 +491,58 @@
     };
   };
 
+  # Atuin configuration - magical shell history
+  programs.atuin = {
+    enable = true;
+    enableBashIntegration = true;
+    enableZshIntegration = true;
+    daemon = {
+      enable = true;
+    };
+    settings = {
+      # Sync configuration
+      auto_sync = true;
+      sync_frequency = "15m";
+      update_check = false;
+      
+      # Search and display
+      dialect = "us";
+      search_mode = "fuzzy"; # or "prefix", "fulltext"
+      filter_mode = "global"; # or "host", "session", "directory"
+      show_preview = true;
+      max_preview_height = 4;
+      
+      # UI preferences
+      style = "compact"; # or "full"
+      inline_height = 25;
+      
+      # Network timeouts (helpful for slow connections)
+      network_connect_timeout = 60;
+      network_timeout = 60;
+      
+      # Local history preferences
+      history_filter = [
+        # Ignore common noise commands
+        "^ls$"
+        "^ll$"
+        "^la$"
+        "^cd$"
+        "^cd \\.\\.?/?$"
+        "^pwd$"
+        "^exit$"
+        "^clear$"
+        "^history"
+        "^atuin"
+      ];
+      
+      # Privacy - avoid syncing sensitive commands
+      secrets_filter = true;
+      
+      # Integration
+      enter_accept = false; # Don't auto-execute selected command
+    };
+  };
+
   # FZF configuration
   programs.fzf = {
     enable = true;

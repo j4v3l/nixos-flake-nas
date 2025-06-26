@@ -23,7 +23,9 @@ nixos-flake-nas/
 │   ├── secrets.nix       # Security and secrets management
 │   ├── storage.nix       # Advanced 6-drive NVMe management
 │   ├── motd.nix          # Server-style MOTD (Message of the Day)
-│   └── wifi.nix          # WiFi configuration
+│   ├── wifi.nix          # WiFi configuration
+│   ├── wireguard.nix     # WireGuard VPN server
+│   └── atuin.nix         # Atuin shell history sync
 │
 ├── home/                  # Home Manager configurations
 │   └── jager.nix         # User-specific configuration
@@ -60,14 +62,17 @@ nixos-flake-nas/
 - **WiFi**: NetworkManager-based WiFi configuration
 - **MOTD**: Professional server-style welcome message with system status
 - **Secrets**: Initial password setup and security checklist
+- **WireGuard**: VPN server with web dashboard management
+- **Atuin**: Shell history sync with end-to-end encryption
 - **Home Manager**: User-specific package management and dotfiles
 
 ### User Configuration
 
-- **Shell**: Bash with NAS-specific aliases
+- **Shell**: Bash and Zsh with NAS-specific aliases and Atuin history sync
 - **Editor**: Vim with server-friendly configuration
-- **Tools**: Git, tmux, htop, network utilities
+- **Tools**: Git, tmux, htop, network utilities, modern CLI replacements
 - **SSH**: Hardened SSH client configuration
+- **History**: Atuin for magical shell history sync across machines
 
 ## 📡 Network Services
 
@@ -154,6 +159,8 @@ journalctl -f
 - [ ] Test Samba access from client
 - [ ] Set up data disk with label 'data'
 - [ ] Configure automatic backups
+- [ ] Set up Atuin shell history sync: `atuin register -u username -e email`
+- [ ] Import existing shell history: `atuin import auto`
 - [ ] Mark passwords configured: `sudo touch /etc/nixos/.passwords-configured`
 
 ## 🔗 Useful Commands & Aliases
@@ -188,6 +195,21 @@ samba-shares             # Show active shares
 samba-logs               # Recent logs
 ```
 
+### Atuin History Management
+
+```bash
+# History Management
+atuin-status             # Check daemon status
+atuin-restart            # Restart daemon
+atuin-logs               # View daemon logs
+atuin-sync               # Manual sync
+atuin-search             # Search history
+atuin-stats              # View statistics
+atuin register           # Register new account
+atuin import auto        # Import existing history
+atuin key                # Show encryption key
+```
+
 ### Storage & Drive Management
 
 ```bash
@@ -195,7 +217,7 @@ samba-logs               # Recent logs
 list-nvme                # List all NVMe drives
 drive-health             # Check all drive health
 drive-temp               # Monitor drive temperatures
-nvme-health              # NVMe health status
+nvme-health              # NVMe health status  
 check-all-drives         # Check all drive usage
 
 # Storage Monitoring

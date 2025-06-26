@@ -10,6 +10,7 @@
     ../../modules/storage.nix
     ../../modules/motd.nix
     ../../modules/wireguard.nix
+    ../../modules/atuin.nix
     # Home Manager configuration is now handled through flake.nix
   ];
 
@@ -17,6 +18,22 @@
   wifi.enable = true;
   storage.enable = true;  # Enable advanced storage management for 6-slot NAS
   motd.enable = true;     # Enable server-style MOTD
+  
+  # Atuin shell history sync configuration
+  atuin = {
+    enable = true;
+    daemon = {
+      enable = true;
+      logLevel = "info";
+      syncFrequency = "15m";
+    };
+    # Optionally enable self-hosted server (disabled by default)
+    # server = {
+    #   enable = true;
+    #   port = 8888;
+    #   registrationDisabled = true;
+    # };
+  };
   
   # WireGuard VPN Configuration
   wireguard = {
