@@ -58,6 +58,9 @@ in
         { name = "storage-status"; description = "View detailed storage information"; }
         { name = "drive-health"; description = "Check all drive health status"; }
         { name = "list-nvme"; description = "List all NVMe drives"; }
+        { name = "dps"; description = "List running containers"; }
+        { name = "lazy"; description = "Docker TUI management (lazydocker)"; }
+        { name = "containers-status"; description = "Check container service status"; }
         { name = "btop"; description = "System resource monitor"; }
         { name = "fastfetch"; description = "Detailed system information"; }
       ];
@@ -237,6 +240,19 @@ in
         SAMBA_STATUS=$(systemctl is-active samba-smbd 2>/dev/null || systemctl is-active smbd 2>/dev/null || systemctl is-active samba 2>/dev/null || echo "inactive")
         STORAGE_STATUS=$(systemctl is-active storage-setup 2>/dev/null || echo "inactive")
         
+        # Container services status (if enabled)
+        DOCKER_STATUS=$(systemctl is-active docker 2>/dev/null || echo "inactive")
+        CONTAINERS_STATUS=$(systemctl is-active docker-compose-nas 2>/dev/null || echo "inactive")
+        
+        # Count running containers
+        if command -v docker >/dev/null 2>&1 && [ "$DOCKER_STATUS" = "active" ]; then
+          RUNNING_CONTAINERS=$(docker ps --format "{{.Names}}" 2>/dev/null | wc -l || echo "0")
+          TOTAL_CONTAINERS=$(docker ps -a --format "{{.Names}}" 2>/dev/null | wc -l || echo "0")
+        else
+          RUNNING_CONTAINERS="0"
+          TOTAL_CONTAINERS="0"
+        fi
+        
         # Header with hostname - improved banner generation
         echo ""
         echo -e "''${CYAN}╔══════════════════════════════════════════════════════════════════════════════╗''${NC}"
@@ -350,6 +366,21 @@ in
           echo -e "  ''${GREEN}●''${NC} Storage Mgmt  : ''${GREEN}Active''${NC}"
         else
           echo -e "  ''${RED}●''${NC} Storage Mgmt  : ''${RED}Inactive''${NC}"
+        fi
+        
+        # Container Services Status (if Docker is available)
+        if command -v docker >/dev/null 2>&1; then
+          if [ "$DOCKER_STATUS" = "active" ]; then
+            echo -e "  ''${GREEN}●''${NC} Docker Engine : ''${GREEN}Running''${NC}"
+          else
+            echo -e "  ''${RED}●''${NC} Docker Engine : ''${RED}Stopped''${NC}"
+          fi
+          
+          if [ "$CONTAINERS_STATUS" = "active" ]; then
+            echo -e "  ''${GREEN}●''${NC} NAS Containers: ''${GREEN}Running ($RUNNING_CONTAINERS/$TOTAL_CONTAINERS)''${NC}"
+          else
+            echo -e "  ''${RED}●''${NC} NAS Containers: ''${RED}Stopped ($RUNNING_CONTAINERS/$TOTAL_CONTAINERS)''${NC}"
+          fi
         fi
         echo ""
         

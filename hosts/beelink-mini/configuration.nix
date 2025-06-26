@@ -11,6 +11,7 @@
     ../../modules/motd.nix
     ../../modules/wireguard.nix
     ../../modules/atuin.nix
+    ../../modules/containers.nix
     # Home Manager configuration is now handled through flake.nix
   ];
 
@@ -18,6 +19,46 @@
   wifi.enable = true;
   storage.enable = true;  # Enable advanced storage management for 6-slot NAS
   motd.enable = true;     # Enable server-style MOTD
+  
+  # Container management configuration
+  containerServices = {
+    enable = true;
+    # Enable essential NAS services
+    services = {
+      media = {
+        enable = true;
+        type = "jellyfin";
+        # Uses /mnt/data/media from storage module by default
+      };
+      sync = {
+        enable = true;
+        type = "syncthing";
+        # Uses /mnt/data/sync by default
+      };
+      downloads = {
+        enable = true;
+        services = [ "qbittorrent" ];
+        # Uses /mnt/data/downloads by default
+      };
+      # Monitoring disabled by default - uncomment to enable
+      # monitoring = {
+      #   enable = true;
+      #   prometheus.enable = true;
+      #   grafana.enable = true;
+      # };
+    };
+    # Security follows existing patterns
+    security = {
+      restrictToLocalNetwork = true;
+      enableFirewall = true;
+      # Inherits allowed networks from WireGuard and Samba configs
+    };
+    management = {
+      enablePortainer = true;
+      enableWatchtower = false;  # Temporarily disabled for initial testing
+      backupContainers = true;
+    };
+  };
   
   # Atuin shell history sync configuration
   atuin = {
