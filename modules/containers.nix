@@ -425,6 +425,10 @@ ${optionalString (cfg.services.media.enable && cfg.services.media.type == "jelly
       - ${cfg.services.media.mediaPath}:/media:ro
       - ${cfg.dataPath}/containers/jellyfin/config:/config
       - ${cfg.dataPath}/containers/jellyfin/cache:/cache
+    ${optionalString cfg.services.media.enableHardwareAccel ''
+    devices:
+      - /dev/dri:/dev/dri  # GPU access for hardware transcoding
+    ''}
     environment:
       - JELLYFIN_PublishedServerUrl=http://$(hostname -I | awk '{print $1}'):${toString cfg.services.media.port}
     networks:

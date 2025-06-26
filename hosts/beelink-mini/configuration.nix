@@ -28,6 +28,7 @@
       media = {
         enable = true;
         type = "jellyfin";
+        enableHardwareAccel = true;  # Now enabled with proper Intel graphics drivers
         # Uses /mnt/data/media from storage module by default
       };
       sync = {
