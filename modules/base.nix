@@ -10,6 +10,45 @@
   time.timeZone = "America/New_York";
   i18n.defaultLocale = "en_US.UTF-8";
 
+  # Console configuration with enhanced font support
+  console = {
+    font = "ter-v32n";  # Terminus font - excellent console font with good glyph support
+    packages = with pkgs; [ 
+      terminus_font 
+      powerline-fonts
+      kbd  # Provides additional console fonts
+    ];
+    keyMap = "us";
+    earlySetup = true;
+    colors = [
+      "1e1e2e" # base - Catppuccin Mocha theme for console
+      "f38ba8" # red  
+      "a6e3a1" # green
+      "f9e2af" # yellow
+      "89b4fa" # blue
+      "f5c2e7" # magenta
+      "94e2d5" # cyan
+      "bac2de" # white
+      "585b70" # bright black
+      "f38ba8" # bright red
+      "a6e3a1" # bright green
+      "f9e2af" # bright yellow
+      "89b4fa" # bright blue
+      "f5c2e7" # bright magenta
+      "94e2d5" # bright cyan
+      "a6adc8" # bright white
+    ];
+  };
+
+  # Add Nerd Fonts for terminal emulators (when you SSH in)
+  fonts.packages = with pkgs; [
+    nerd-fonts.fira-code
+    nerd-fonts.jetbrains-mono  
+    nerd-fonts.hack
+    terminus_font
+    powerline-fonts
+  ];
+
   # User configuration
   users.users.jager = {
     isNormalUser = true;
@@ -25,7 +64,6 @@
 
   # Enable services
   virtualisation.docker.enable = true;
-  programs.zsh.enable = true;
 
   # System packages
   environment.systemPackages = with pkgs; [
@@ -156,7 +194,36 @@
 
   # Additional shell configuration
   programs.bash.shellInit = ''
-    # Custom prompt for server
+    # Custom prompt for server with better colors
     export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+    
+    # Show available console fonts
+    alias show-console-fonts='ls -la /run/current-system/sw/share/consolefonts/ 2>/dev/null || echo "Console fonts not found in expected location"'
+    
+    # Console font management aliases  
+    alias set-font-large='sudo setfont ter-v32n'
+    alias set-font-medium='sudo setfont ter-v22n' 
+    alias set-font-small='sudo setfont ter-v16n'
+    alias show-current-font='showconsolefont 2>/dev/null || echo "showconsolefont not available"'
   '';
+
+  # ZSH configuration with font management aliases
+  programs.zsh = {
+    enable = true;
+    shellAliases = {
+      # Console font management aliases  
+      "set-font-large" = "sudo setfont ter-v32n";
+      "set-font-medium" = "sudo setfont ter-v22n";
+      "set-font-small" = "sudo setfont ter-v16n";
+      "show-console-fonts" = "ls -la /run/current-system/sw/share/consolefonts/ 2>/dev/null || echo 'Console fonts not found in expected location'";
+      "show-current-font" = "echo 'showconsolefont only works on direct console (Ctrl+Alt+F1-F6), not SSH'";
+    };
+    ohMyZsh = {
+      enable = true;
+      theme = "";
+    };
+  };
+
+  # Disable command-not-found to prevent database errors
+  programs.command-not-found.enable = false;
 }
