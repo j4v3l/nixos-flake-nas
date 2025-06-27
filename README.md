@@ -220,6 +220,10 @@ drive-temp               # Monitor drive temperatures
 nvme-health              # NVMe health status  
 check-all-drives         # Check all drive usage
 
+# Performance Benchmarking
+nvme-bench               # Access benchmark commands
+nvme-bench-all           # Quick benchmark all drives
+
 # Storage Monitoring
 storage-status           # Storage services status
 storage-logs             # Storage service logs

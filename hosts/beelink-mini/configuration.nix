@@ -8,6 +8,7 @@
     ../../modules/secrets.nix
     ../../modules/wifi.nix
     ../../modules/storage.nix
+    ../../modules/nvme-manager.nix
     ../../modules/motd.nix
     ../../modules/wireguard.nix
     ../../modules/atuin.nix
@@ -18,6 +19,7 @@
   networking.hostName = "beelink-mini";
   wifi.enable = true;
   storage.enable = true;  # Enable advanced storage management for 6-slot NAS
+  nvmeManager.enable = true;  # Enable comprehensive NVMe drive management
   motd.enable = true;     # Enable server-style MOTD
   
   # Container management configuration

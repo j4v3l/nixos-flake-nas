@@ -58,6 +58,7 @@ in
         { name = "storage-status"; description = "View detailed storage information"; }
         { name = "drive-health"; description = "Check all drive health status"; }
         { name = "list-nvme"; description = "List all NVMe drives"; }
+        { name = "nvme-bench-all"; description = "Quick benchmark all drives"; }
         { name = "dps"; description = "List running containers"; }
         { name = "lazy"; description = "Docker TUI management (lazydocker)"; }
         { name = "containers-status"; description = "Check container service status"; }
